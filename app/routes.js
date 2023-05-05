@@ -1,19 +1,19 @@
-module.exports = function(app, passport, db) {
+module.exports = function(app, passport, db, ObjectId) {
 
 // normal routes ===============================================================
 
     // show the home page (will also have our login links)
     app.get('/', function(req, res) {
-        res.render('index.ejs');
+        res.render('index.ejs', {dates: res});
     });
 
     // PROFILE SECTION =========================
     app.get('/profile', isLoggedIn, function(req, res) {
-        db.collection('messages').find().toArray((err, result) => {
+        db.collection('dates').find({name: req.user.local.email, password: req.user.local.password }).sort({date: -1}).toArray((err, result) => {
           if (err) return console.log(err)
           res.render('profile.ejs', {
             user : req.user,
-            messages: result
+            dates: result
           })
         })
     });
@@ -26,48 +26,39 @@ module.exports = function(app, passport, db) {
         res.redirect('/');
     });
 
-// message board routes ===============================================================
+// entry routes ===============================================================
 
-    app.post('/messages', (req, res) => {
-      db.collection('messages').save({name: req.body.name, msg: req.body.msg, thumbUp: 0, thumbDown:0}, (err, result) => {
+    app.post('/dates', (req, res) => {
+      console.log(req.body, 'bodyody')
+      db.collection('dates').save({name: req.user.local.email, password: req.user.local.password, context: req.body.context, date: req.body.dateform, symptoms: req.body.symp, }, (err, result) => {
         if (err) return console.log(err)
         console.log('saved to database')
         res.redirect('/profile')
       })
+      
     })
 
-    app.put('/messages/up/', (req, res) => {
-      db.collection('messages')
-      .findOneAndUpdate({name: req.body.name, msg: req.body.msg}, {
-        $set: {
-          thumbUp:req.body.thumbUp + 1
+    app.put('/date/:id', (req, res) => {
+      console.log(req.body, 'bodyody')
+      const id = ObjectId(req.params.id)
+      const context = req.body.context
+      const date = req.body.date
+      const symptoms = req.body.symptoms
+      db.collection('dates').findOneAndUpdate(
+        {_id: id},
+        {$set: {context: context, date: date, symptoms: symptoms}},
+        (err, result) => {
+          if (err) return res.send(500, err)
+          res.send('Post updated!')
         }
-      }, {
-        sort: {_id: -1},
-        upsert: true
-      }, (err, result) => {
-        if (err) return res.send(err)
-        res.send(result)
-      })
+      );
     })
 
-    app.put('/messages/down/', (req, res) => {
-      db.collection('messages')
-      .findOneAndUpdate({name: req.body.name, msg: req.body.msg}, {
-        $set: {
-          thumbUp:req.body.thumbUp - 1
-        }
-      }, {
-        sort: {_id: -1},
-        upsert: true
-      }, (err, result) => {
-        if (err) return res.send(err)
-        res.send(result)
-      })
-    })
 
-    app.delete('/messages', (req, res) => {
-      db.collection('messages').findOneAndDelete({name: req.body.name, msg: req.body.msg}, (err, result) => {
+
+    app.delete('/dates', (req, res) => {
+      console.log(req.body)
+      db.collection('dates').findOneAndDelete({name: req.user.local.email, password: req.user.local.password, date: req.body.date, symptoms: req.body.symptoms}, (err, result) => {
         if (err) return res.send(500, err)
         res.send('Message deleted!')
       })
@@ -88,7 +79,7 @@ module.exports = function(app, passport, db) {
         app.post('/login', passport.authenticate('local-login', {
             successRedirect : '/profile', // redirect to the secure profile section
             failureRedirect : '/login', // redirect back to the signup page if there is an error
-            failureFlash : true // allow flash messages
+            failureFlash : true // allow flash dates
         }));
 
         // SIGNUP =================================
@@ -101,7 +92,7 @@ module.exports = function(app, passport, db) {
         app.post('/signup', passport.authenticate('local-signup', {
             successRedirect : '/profile', // redirect to the secure profile section
             failureRedirect : '/signup', // redirect back to the signup page if there is an error
-            failureFlash : true // allow flash messages
+            failureFlash : true // allow flash dates
         }));
 
 // =============================================================================
